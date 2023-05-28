@@ -1,0 +1,368 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[111]:
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import math
+import statistics
+import sklearn.metrics
+from sklearn.metrics import mean_squared_error
+
+
+# In[112]:
+
+
+data = pd.read_csv("COVID19FDS.csv") 
+
+
+# In[113]:
+
+
+data = data.reset_index(drop=True)
+
+
+# In[114]:
+
+
+data
+
+
+# In[115]:
+
+
+data.info
+
+
+# In[116]:
+
+
+data.dropna()
+
+
+# In[117]:
+
+
+data.dropna(inplace=True)
+
+
+# In[118]:
+
+
+data.info()
+
+
+# In[119]:
+
+
+from sklearn.model_selection import train_test_split
+
+X = data.drop(['TREATMENT PRICES(RS)'], axis=1)
+Y = data['TREATMENT PRICES(RS)']
+
+
+# In[120]:
+
+
+Y
+
+
+# In[121]:
+
+
+X
+
+
+# In[122]:
+
+
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
+
+
+# In[123]:
+
+
+train_data = X_train.join(Y_train)
+
+
+# In[124]:
+
+
+train_data
+
+
+# In[125]:
+
+
+X_test
+
+
+# In[126]:
+
+
+train_data.hist(figsize=(20,23))
+
+
+# In[127]:
+
+
+plt.figure(figsize=(20,10))
+sns.heatmap(train_data.corr(), annot=True, cmap="YlGnBu")
+
+
+# In[128]:
+
+
+X_train
+
+
+# In[131]:
+
+
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import confusion_matrix, mean_squared_error
+from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+
+X_train, Y_train = train_data.drop(['TREATMENT PRICES(RS)'], axis=1), train_data['TREATMENT PRICES(RS)']
+X_train_s = scaler.fit_transform(X_train)
+
+reg = LinearRegression()
+
+reg.fit(X_train_s, Y_train)
+reg_rmse= np.sqrt(mean_squared_error(Y_train, reg.predict(X_train_s)))
+
+
+# In[133]:
+
+
+test_data = X_test.join(Y_test)
+X_test, Y_test = test_data.drop(['TREATMENT PRICES(RS)'], axis=1), test_data['TREATMENT PRICES(RS)']
+
+
+# In[134]:
+
+
+X_test_s = scaler.transform(X_test)
+
+
+# In[135]:
+
+
+reg.score(X_test_s, Y_test)
+
+
+# In[136]:
+
+
+reg_rmse= np.sqrt(mean_squared_error(Y_test, reg.predict(X_test_s)))
+
+
+# In[137]:
+
+
+reg_rmse
+
+
+# In[138]:
+
+
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error
+
+dt = DecisionTreeRegressor()
+
+dt.fit(X_train_s, Y_train)
+
+dt_rmse= np.sqrt(mean_squared_error(Y_train, dt.predict(X_train_s)))
+
+
+# In[140]:
+
+
+dt_rmse
+
+
+# In[141]:
+
+
+from sklearn.model_selection import cross_val_score
+scores = cross_val_score(dt,X_train_s, Y_train, scoring = 'neg_mean_squared_error', cv=13)
+
+
+# In[142]:
+
+
+scores
+
+
+# In[143]:
+
+
+dtrees_rmse = np.sqrt(-scores)
+
+
+# In[144]:
+
+
+dtrees_rmse
+
+
+# In[145]:
+
+
+mean = statistics.mean(dtrees_rmse)
+
+
+# In[146]:
+
+
+mean
+
+
+# In[147]:
+
+
+dt.score(X_test_s, Y_test)
+
+
+# In[148]:
+
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+
+forest = RandomForestRegressor()
+
+forest.fit(X_train, Y_train)
+
+forest_rmse=np.sqrt(mean_squared_error(Y_train, forest.predict(X_train_s)))
+
+
+# In[149]:
+
+
+forest.score(X_test, Y_test)
+
+
+# In[150]:
+
+
+forest_rmse
+
+
+# In[151]:
+
+
+from sklearn.model_selection import GridSearchCV
+
+forest_scores=cross_val_score(forest,X_train_s, Y_train, scoring = 'neg_mean_squared_error', cv=3)
+forest_rmse1 = np.sqrt(-forest_scores)
+
+
+# In[152]:
+
+
+forest_scores
+
+
+# In[153]:
+
+
+forest_rmse1
+
+
+# In[154]:
+
+
+mean1 = statistics.mean(forest_rmse1)
+
+
+# In[155]:
+
+
+mean1
+
+
+# In[156]:
+
+
+from sklearn.model_selection import GridSearchCV
+
+param_grid= {
+    "n_estimators" : [100, 200, 300],
+    "min_samples_split" : [2, 4],
+    "max_depth" : [None, 4, 8]
+}
+
+grid_search = GridSearchCV(forest, param_grid, cv=5, scoring="neg_mean_squared_error", return_train_score=True)
+
+grid_search.fit(X_train_s, Y_train)
+
+
+# In[157]:
+
+
+best_forest = grid_search.best_estimator_
+
+
+# In[158]:
+
+
+best_forest.score(X_train_s, Y_train)
+
+
+# In[159]:
+
+
+cv_res=grid_search.cv_results_
+
+for mean_score, params in zip(cv_res['mean_test_score'], cv_res['params']):
+    print(np.sqrt(-mean_score), params)
+
+
+# In[160]:
+
+
+feature_importances = grid_search.best_estimator_.feature_importances_
+
+
+# In[161]:
+
+
+feature_importances
+
+
+# In[162]:
+
+
+from sklearn.metrics import accuracy_score, mean_squared_error
+
+X_predictions = forest.predict(X_test)
+
+final_mse = mean_squared_error(Y_test, X_predictions)
+final_rmse = np.sqrt(final_mse)
+
+
+# In[163]:
+
+
+X_predictions
+
+
+# In[164]:
+
+
+final_rmse
+
+
+# In[ ]:
+
+
+
+
